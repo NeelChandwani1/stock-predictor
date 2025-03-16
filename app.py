@@ -57,6 +57,26 @@ def index():
             return render_template('index.html', plot_url=plot_url, ticker=ticker)
     return render_template('index.html', plot_url=None)
 
+@app.route('/predict', methods=['POST'])
+def predict():
+    try:
+        if request.method == 'POST':
+            # Print input data for debugging
+            print("Request Data:", request.form)
+
+            # Example: if using some data to make predictions
+            prediction = make_prediction_function()
+
+            # Print the prediction result
+            print("Prediction:", prediction)
+
+            return render_template('index.html', prediction_text=prediction)
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return "An error occurred during prediction", 500
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5001, debug=True)
 
