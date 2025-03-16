@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Market Predictor</title>
+</head>
+<body>
+    <h1>Stock Market Predictor</h1>
+    <form method="POST">
+        <label for="ticker">Stock Ticker:</label>
+        <input type="text" id="ticker" name="ticker" placeholder="e.g., AAPL" required>
+        <br>
+        <label for="start_date">Start Date:</label>
+        <input type="date" id="start_date" name="start_date" value="2022-10-01" required>
+        <small>Select the start date for historical data.</small>
+        <br>
+        <label for="end_date">End Date:</label>
+        <input type="date" id="end_date" name="end_date" value="2023-10-01" required>
+        <small>Select the end date for historical data.</small>
+        <br>
+        <button type="submit">Predict</button>
+    </form>
+
+    {% if prediction %}
+        <h2>Predicted Price: {{ prediction }}</h2>
+    {% endif %}
+
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+</body>
+</html>
