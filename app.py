@@ -11,15 +11,21 @@ app = Flask(__name__)
 def fetch_stock_data(ticker, start_date, end_date):
     try:
         print(f"Fetching data for ticker: {ticker}, start_date: {start_date}, end_date: {end_date}")
-        ticker_obj = yf.Ticker(ticker)
-        stock_data = ticker_obj.history(start=start_date, end=end_date)
+        stock_data = yf.download(ticker, start=start_date, end=end_date)
+        
         if stock_data.empty:
             raise ValueError(f"No data found for ticker: {ticker} and date range: {start_date} to {end_date}")
+        
         stock_data.dropna(inplace=True)  # Remove rows with missing values
         return stock_data
+    except ValueError as ve:
+        print(f"Error fetching data: {str(ve)}")
+        raise
     except Exception as e:
         print(f"Error fetching data: {str(e)}")
         raise ValueError(f"Failed to fetch data: {str(e)}")
+
+
 
 # Prepare data for training
 def prepare_data(stock_data):
