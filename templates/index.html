@@ -4,30 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Market Predictor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>Stock Market Predictor</h1>
-    <form method="POST">
-        <label for="ticker">Stock Ticker:</label>
-        <input type="text" id="ticker" name="ticker" placeholder="e.g., AAPL" required>
-        <br>
-        <label for="start_date">Start Date:</label>
-        <input type="date" id="start_date" name="start_date" value="2022-10-01" required>
-        <small>Select the start date for historical data.</small>
-        <br>
-        <label for="end_date">End Date:</label>
-        <input type="date" id="end_date" name="end_date" value="2023-10-01" required>
-        <small>Select the end date for historical data.</small>
-        <br>
-        <button type="submit">Predict</button>
-    </form>
+    <div class="container">
+        <h1>Stock Market Price Prediction</h1>
 
-    {% if prediction %}
-        <h2>Predicted Price: {{ prediction }}</h2>
-    {% endif %}
+        <form method="POST" action="/">
+            <label for="ticker">Enter Stock Ticker (e.g., AAPL, TSLA):</label>
+            <input type="text" id="ticker" name="ticker" required>
+            <button type="submit">Get Prediction</button>
+        </form>
 
-    {% if error %}
-        <p style="color: red;">{{ error }}</p>
-    {% endif %}
+        {% if plot_url %}
+            <h2>Prediction for {{ ticker }}</h2>
+            <img src="data:image/png;base64,{{ plot_url }}" alt="Stock Price Prediction Plot">
+        {% endif %}
+    </div>
 </body>
 </html>
