@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import io
 import base64
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 app = Flask(__name__)
 
 # Function to get stock data and make predictions
@@ -50,11 +53,17 @@ def get_stock_predictions(ticker):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    print(f"Request method: {request.method}")  # Debug line
     if request.method == 'POST':
         ticker = request.form.get('ticker')
+        print(f"Received ticker: {ticker}")  # Debug line
         if ticker:
-            plot_url = get_stock_predictions(ticker)
-            return render_template('index.html', plot_url=plot_url, ticker=ticker)
+            try:
+                plot_url = get_stock_predictions(ticker)
+                return render_template('index.html', plot_url=plot_url, ticker=ticker)
+            except Exception as e:
+                print(f"Error: {e}")  # Debug line
+                return render_template('index.html', error=str(e))
     return render_template('index.html', plot_url=None)
 
 @app.route('/predict', methods=['POST'])

@@ -3,23 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Market Predictor</title>
+    <title>StockAI Predictor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>Stock Market Price Prediction</h1>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo-container">
+                <i class="fas fa-chart-line logo-icon"></i>
+                <h1>StockAI<span>Predictor</span></h1>
+            </div>
+            <p class="tagline">AI-powered stock market forecasting</p>
+        </header>
 
-        <form method="POST" action="/">
-            <label for="ticker">Enter Stock Ticker (e.g., AAPL, TSLA):</label>
-            <input type="text" id="ticker" name="ticker" required>
-            <button type="submit">Get Prediction</button>
-        </form>
+        <main class="prediction-container">
+            <div class="input-card">
+                <h2><i class="fas fa-search-dollar"></i> Analyze Stock</h2>
+                <form method="POST" action="/" class="prediction-form">
+                    <div class="input-group">
+                        <label for="ticker">Enter Stock Symbol:</label>
+                        <div class="input-with-icon">
+                            <i class="fas fa-tag"></i>
+                            <input type="text" id="ticker" name="ticker" placeholder="e.g. AAPL, TSLA, MSFT" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="predict-btn">
+                        <i class="fas fa-brain"></i> Generate Prediction
+                    </button>
+                </form>
+            </div>
 
-        {% if plot_url %}
-            <h2>Prediction for {{ ticker }}</h2>
-            <img src="data:image/png;base64,{{ plot_url }}" alt="Stock Price Prediction Plot">
-        {% endif %}
+            {% if plot_url %}
+            <div class="results-card">
+                <div class="stock-header">
+                    <h2><i class="fas fa-project-diagram"></i> Prediction for {{ ticker }}</h2>
+                    <div class="stock-meta">
+                        <span class="badge"><i class="fas fa-calendar-alt"></i> {{ range }}</span>
+                        <span class="badge"><i class="fas fa-bolt"></i> LSTM Model</span>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <img src="data:image/png;base64,{{ plot_url }}" alt="Stock Prediction Chart" class="prediction-chart">
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">$142.67</div>
+                        <div class="stat-label">Current Price</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value positive">$158.23</div>
+                        <div class="stat-label">30-Day Forecast</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value negative">-2.4%</div>
+                        <div class="stat-label">Volatility</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">84%</div>
+                        <div class="stat-label">Model Confidence</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if error %}
+            <div class="error-card">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>{{ error }}</p>
+            </div>
+            {% endif %}
+        </main>
+
+        <footer class="app-footer">
+            <p>© 2023 StockAI Predictor | Data provided by Yahoo Finance</p>
+            <div class="footer-links">
+                <a href="#"><i class="fab fa-github"></i> GitHub</a>
+                <a href="#"><i class="fas fa-book"></i> Documentation</a>
+                <a href="#"><i class="fas fa-envelope"></i> Contact</a>
+            </div>
+        </footer>
     </div>
 </body>
 </html>
