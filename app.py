@@ -12,19 +12,15 @@ import talib  # Technical Analysis Library
 
 app = Flask(__name__)
 
-# Enhanced data preprocessing
 def preprocess_data(ticker):
-    # Get extended historical data
     stock_data = yf.download(ticker, start="2000-01-01")
     
-    # Add technical indicators
     stock_data['50_MA'] = stock_data['Close'].rolling(50).mean()
     stock_data['200_MA'] = stock_data['Close'].rolling(200).mean()
     stock_data['RSI'] = talib.RSI(stock_data['Close'], timeperiod=14)
     macd, signal, _ = talib.MACD(stock_data['Close'])
     stock_data['MACD'] = macd - signal
     
-    # Add fundamental data
     try:
         fundamentals = yf.Ticker(ticker).info
         stock_data['PE_Ratio'] = fundamentals.get('trailingPE', np.nan)
@@ -32,11 +28,9 @@ def preprocess_data(ticker):
     except:
         pass
     
-    # Clean data
     stock_data.dropna(inplace=True)
     return stock_data
 
-# LSTM Model
 def create_lstm_model(input_shape):
     model = Sequential([
         LSTM(64, return_sequences=True, input_shape=input_shape),
@@ -50,47 +44,38 @@ def create_lstm_model(input_shape):
     return model
 
 def get_stock_predictions(ticker):
-    # Get enhanced data
     stock_data = preprocess_data(ticker)
     
-    # Prepare data for LSTM
     scaler = MinMaxScaler(feature_range=(0,1))
     scaled_data = scaler.fit_transform(stock_data[['Close','50_MA','RSI','MACD']])
     
-    # Create sequences
     X, y = [], []
     sequence_length = 60
     
     for i in range(sequence_length, len(scaled_data)):
         X.append(scaled_data[i-sequence_length:i])
-        y.append(scaled_data[i, 0])  # Close price is first column
+        y.append(scaled_data[i, 0])  
         
     X, y = np.array(X), np.array(y)
     
-    # Split data (80% train, 20% test)
     split = int(0.8 * len(X))
     X_train, X_test = X[:split], X[split:]
     y_train, y_test = y[:split], y[split:]
     
-    # Build and train model
     model = create_lstm_model((X_train.shape[1], X_train.shape[2]))
     model.fit(X_train, y_train, epochs=20, batch_size=32, verbose=0)
     
-    # Make predictions
     predictions = model.predict(X_test)
     
-    # Inverse transform predictions
     test_predictions = scaler.inverse_transform(
         np.concatenate((predictions, np.zeros((len(predictions), scaled_data.shape[1]-1))), axis=1)
     )[:,0]
     
-    # Prepare plot
     plt.figure(figsize=(14,7))
     actual_prices = stock_data['Close'][-len(y_test):]
     plt.plot(actual_prices.index, actual_prices, label='Actual Price', color='blue')
     plt.plot(actual_prices.index, test_predictions, label='Predicted Price', color='red', linestyle='--')
     
-    # Add confidence interval
     confidence = np.std(test_predictions - actual_prices.values)
     plt.fill_between(actual_prices.index, 
                     test_predictions - confidence, 
@@ -102,11 +87,9 @@ def get_stock_predictions(ticker):
     plt.ylabel('Price ($)')
     plt.legend()
     
-    # Calculate model metrics
     mse = np.mean((test_predictions - actual_prices.values)**2)
     accuracy = max(0, 100 * (1 - mse/np.var(actual_prices.values)))
     
-    # Save plot
     img = io.BytesIO()
     plt.savefig(img, format='png', bbox_inches='tight')
     img.seek(0)
