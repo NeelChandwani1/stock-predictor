@@ -1,91 +1,135 @@
 from flask import Flask, render_template, request
 import yfinance as yf
-import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
 import matplotlib.pyplot as plt
 import io
 import base64
-
-import logging
-logging.basicConfig(level=logging.DEBUG)
+import talib  # Technical Analysis Library
 
 app = Flask(__name__)
 
-# Function to get stock data and make predictions
-def get_stock_predictions(ticker):
-    # Fetch stock data
-    stock_data = yf.download(ticker, start="2010-01-01", end="2025-01-01")
-
-    # Add a new column for the 'next day's close price'
-    stock_data['Next Close'] = stock_data['Close'].shift(-1)
-
-    # Drop the last row since the next close value is missing
+# Enhanced data preprocessing
+def preprocess_data(ticker):
+    # Get extended historical data
+    stock_data = yf.download(ticker, start="2000-01-01")
+    
+    # Add technical indicators
+    stock_data['50_MA'] = stock_data['Close'].rolling(50).mean()
+    stock_data['200_MA'] = stock_data['Close'].rolling(200).mean()
+    stock_data['RSI'] = talib.RSI(stock_data['Close'], timeperiod=14)
+    macd, signal, _ = talib.MACD(stock_data['Close'])
+    stock_data['MACD'] = macd - signal
+    
+    # Add fundamental data
+    try:
+        fundamentals = yf.Ticker(ticker).info
+        stock_data['PE_Ratio'] = fundamentals.get('trailingPE', np.nan)
+        stock_data['Profit_Margin'] = fundamentals.get('profitMargins', np.nan)
+    except:
+        pass
+    
+    # Clean data
     stock_data.dropna(inplace=True)
+    return stock_data
 
-    # Features and target variable
-    X = stock_data[['Close']]
-    y = stock_data['Next Close']
+# LSTM Model
+def create_lstm_model(input_shape):
+    model = Sequential([
+        LSTM(64, return_sequences=True, input_shape=input_shape),
+        Dropout(0.2),
+        LSTM(32, return_sequences=False),
+        Dropout(0.2),
+        Dense(16, activation='relu'),
+        Dense(1)
+    ])
+    model.compile(optimizer='adam', loss='mean_squared_error')
+    return model
 
-    # Train the linear regression model
-    model = LinearRegression()
-    model.fit(X, y)
-
+def get_stock_predictions(ticker):
+    # Get enhanced data
+    stock_data = preprocess_data(ticker)
+    
+    # Prepare data for LSTM
+    scaler = MinMaxScaler(feature_range=(0,1))
+    scaled_data = scaler.fit_transform(stock_data[['Close','50_MA','RSI','MACD']])
+    
+    # Create sequences
+    X, y = [], []
+    sequence_length = 60
+    
+    for i in range(sequence_length, len(scaled_data)):
+        X.append(scaled_data[i-sequence_length:i])
+        y.append(scaled_data[i, 0])  # Close price is first column
+        
+    X, y = np.array(X), np.array(y)
+    
+    # Split data (80% train, 20% test)
+    split = int(0.8 * len(X))
+    X_train, X_test = X[:split], X[split:]
+    y_train, y_test = y[:split], y[split:]
+    
+    # Build and train model
+    model = create_lstm_model((X_train.shape[1], X_train.shape[2]))
+    model.fit(X_train, y_train, epochs=20, batch_size=32, verbose=0)
+    
     # Make predictions
-    predictions = model.predict(X)
-
-    # Plotting the results
-    plt.figure(figsize=(10, 6))
-    plt.plot(stock_data.index, y, label='Actual', color='blue')
-    plt.plot(stock_data.index, predictions, label='Predicted', color='red')
-    plt.title(f'{ticker} Stock Price Prediction')
+    predictions = model.predict(X_test)
+    
+    # Inverse transform predictions
+    test_predictions = scaler.inverse_transform(
+        np.concatenate((predictions, np.zeros((len(predictions), scaled_data.shape[1]-1))), axis=1)
+    )[:,0]
+    
+    # Prepare plot
+    plt.figure(figsize=(14,7))
+    actual_prices = stock_data['Close'][-len(y_test):]
+    plt.plot(actual_prices.index, actual_prices, label='Actual Price', color='blue')
+    plt.plot(actual_prices.index, test_predictions, label='Predicted Price', color='red', linestyle='--')
+    
+    # Add confidence interval
+    confidence = np.std(test_predictions - actual_prices.values)
+    plt.fill_between(actual_prices.index, 
+                    test_predictions - confidence, 
+                    test_predictions + confidence, 
+                    color='orange', alpha=0.3)
+    
+    plt.title(f'{ticker} Price Prediction (LSTM Model)')
     plt.xlabel('Date')
-    plt.ylabel('Stock Price')
+    plt.ylabel('Price ($)')
     plt.legend()
-
-    # Save the plot to a BytesIO object and encode it in base64 for embedding in the HTML
+    
+    # Calculate model metrics
+    mse = np.mean((test_predictions - actual_prices.values)**2)
+    accuracy = max(0, 100 * (1 - mse/np.var(actual_prices.values)))
+    
+    # Save plot
     img = io.BytesIO()
-    plt.savefig(img, format='png')
+    plt.savefig(img, format='png', bbox_inches='tight')
     img.seek(0)
     plot_url = base64.b64encode(img.getvalue()).decode()
-
-    return plot_url
+    
+    return plot_url, accuracy, mse, test_predictions[-1]
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    print(f"Request method: {request.method}")  # Debug line
     if request.method == 'POST':
-        ticker = request.form.get('ticker')
-        print(f"Received ticker: {ticker}")  # Debug line
-        if ticker:
-            try:
-                plot_url = get_stock_predictions(ticker)
-                return render_template('index.html', plot_url=plot_url, ticker=ticker)
-            except Exception as e:
-                print(f"Error: {e}")  # Debug line
-                return render_template('index.html', error=str(e))
-    return render_template('index.html', plot_url=None)
-
-@app.route('/predict', methods=['POST'])
-def predict():
-    try:
-        if request.method == 'POST':
-            # Print input data for debugging
-            print("Request Data:", request.form)
-
-            # Example: if using some data to make predictions
-            prediction = make_prediction_function()
-
-            # Print the prediction result
-            print("Prediction:", prediction)
-
-            return render_template('index.html', prediction_text=prediction)
-
-    except Exception as e:
-        print(f"Error: {e}")
-        return "An error occurred during prediction", 500
-
+        ticker = request.form.get('ticker').upper()
+        try:
+            plot_url, accuracy, mse, last_pred = get_stock_predictions(ticker)
+            return render_template('index.html', 
+                                 plot_url=plot_url,
+                                 ticker=ticker,
+                                 accuracy=f"{accuracy:.1f}",
+                                 mse=f"{mse:.2f}",
+                                 prediction=f"{last_pred:.2f}")
+        except Exception as e:
+            error = f"Error processing {ticker}: {str(e)}"
+            return render_template('index.html', error=error)
+    return render_template('index.html')
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5002, debug=True)
-
+    app.run(host='0.0.0.0', port=5001, debug=True)
